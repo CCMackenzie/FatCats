@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from pathlib import Path
 from typing import Sequence 
@@ -24,9 +24,6 @@ class FatCatsConfig(BaseModel):
         default_factory=lambda: [5, 10, 12, 15],
         description="Population to sample each player's trick hand from",
     )
-
-    # --- model config ------------------------------------------------------
-    model_config = ConfigDict(extra="forbid", frozen=True, slots=True)
 
     @field_validator("treat_values", "trick_values", mode="before")
     @classmethod
