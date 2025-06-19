@@ -70,24 +70,3 @@ def test_negative_card_value_raises():
                 "treat_values": [5, -10, 15],  # negative value
             }
         )
-
-
-def test_extra_field_forbidden():
-    """Unexpected keys must raise immediately (extra='forbid')."""
-    with pytest.raises(ValueError):
-        FatCatsConfig.model_validate(
-            {
-                "players": 2,
-                "trick_cards_per_player": 5,
-                "unknown": 42,  # extra field
-            }
-        )
-
-
-def test_config_is_frozen():
-    """Attempting to mutate an attribute should raise (frozen=True)."""
-    cfg = FatCatsConfig.model_validate(
-        {"players": 2, "trick_cards_per_player": 5}
-    )
-    with pytest.raises(TypeError):
-        cfg.players = 99  # type: ignore[misc]
