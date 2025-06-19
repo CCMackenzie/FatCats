@@ -1,0 +1,7 @@
+{
+    "number_of_players": 4,
+    "trick_cards_per_player": 10,
+    "trick_cards_values": [5, 10, 12, 15],
+    "treat_cards_values": [5, 10, 15, 20],
+    "allow_multibid": true
+}
