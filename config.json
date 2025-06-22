@@ -1,7 +1,8 @@
 {
-    "number_of_players": 4,
+    "number_of_players": 2,
     "trick_cards_per_player": 10,
-    "trick_cards_values": [5, 10, 12, 15],
-    "treat_cards_values": [5, 10, 15, 20],
-    "allow_multibid": true
+    "treat_deck_size": 9,
+    "trick_card_values": [5, 10, 12, 15],
+    "treat_card_values": [5, 10, 15, 20],
+    "allow_multi_bid": true
 }

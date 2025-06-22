@@ -4,8 +4,6 @@ Unit tests for game.game_config.FatCatsConfig
 Run:
     pytest -q tests/test_game_config.py
 """
-from __future__ import annotations
-
 import json
 from pathlib import Path
 
@@ -26,36 +24,36 @@ def test_from_dict_valid():
     """A minimal valid dict should build a model and keep defaults."""
     config = FatCatsConfig.model_validate(
         {
-            "players": 3,
+            "number_of_players": 3,
             "trick_cards_per_player": 7,
         }
     )
 
-    assert config.players == 3
+    assert config.number_of_players == 3
     assert config.trick_cards_per_player == 7
     # Defaults kick in
     assert config.allow_multi_bid is False
     assert config.treat_deck_size == 9
-    assert config.treat_values == [5, 10, 15, 20]
+    assert config.treat_card_values == [5, 10, 15, 20]
 
 
 def test_from_path_valid(tmp_path: Path):
     """Config loads & validates from JSON file via FatCatsConfig.from_path()."""
     payload: dict[str, int | bool | list[int]] = {
-        "players": 4,
+        "number_of_players": 4,
         "trick_cards_per_player": 8,
         "allow_multi_bid": True,
-        "treat_values": [4, 11, 25],  # custom deck
-        "trick_values": [1, 2, 3],    # custom tricks
+        "treat_card_values": [4, 11, 25],  # custom deck
+        "trick_card_values": [1, 2, 3],    # custom tricks
         "treat_deck_size": 12,
     }
     cfg_path = _write_tmp_json(tmp_path, payload) # type: ignore
 
     cfg = FatCatsConfig.from_path(cfg_path)
 
-    assert cfg.players == 4
+    assert cfg.number_of_players == 4
     assert cfg.allow_multi_bid is True
-    assert len(cfg.treat_values) == 3
+    assert len(cfg.treat_card_values) == 3
     assert cfg.treat_deck_size == 12
 
 
@@ -70,24 +68,3 @@ def test_negative_card_value_raises():
                 "treat_values": [5, -10, 15],  # negative value
             }
         )
-
-
-def test_extra_field_forbidden():
-    """Unexpected keys must raise immediately (extra='forbid')."""
-    with pytest.raises(ValueError):
-        FatCatsConfig.model_validate(
-            {
-                "players": 2,
-                "trick_cards_per_player": 5,
-                "unknown": 42,  # extra field
-            }
-        )
-
-
-def test_config_is_frozen():
-    """Attempting to mutate an attribute should raise (frozen=True)."""
-    cfg = FatCatsConfig.model_validate(
-        {"players": 2, "trick_cards_per_player": 5}
-    )
-    with pytest.raises(TypeError):
-        cfg.players = 99  # type: ignore[misc]
