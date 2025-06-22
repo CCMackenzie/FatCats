@@ -26,22 +26,27 @@ class FatCatsEnv(gym.Env):
         self._initialize_game_state()
         return self._create_observation(0), {}
     
-    def step(self, action) -> tuple[np.ndarray, float, bool, bool, dict]:
+    def step(self, action: np.ndarray) -> tuple[np.ndarray, float, bool, bool, dict]:
         player_index: int = self.turn
         bid_value: int = self._apply_action_and_get_bid(player_index, action)
         self.current_round_bids[player_index] = bid_value
 
         # rotate turn pointer
-        self.turn = (self.turn + 1) % self.game_config.players
+        self.turn = (self.turn + 1) % self.game_config.number_of_players
         episode_terminated = truncated = False
         reward = 0.0
 
         # if the last player has acted then resolve round
         if self.turn == 0:
             self._resolve_current_round()
-            epissode_terminated = self.treat_idx == self.game_config.treat_deck_size
+            # Episode ends after the final Treat card is resolved.
+            episode_terminated = (
+                self.treat_idx >= self.game_config.treat_deck_size
+            )
+        else:
+            episode_terminated = False  # game continues
         
-        observation = self._create_observation(player_index)
+        observation = self._create_observation(self.turn)
         return observation, reward, episode_terminated, truncated, {}
 
     # Structure helper methods
@@ -61,7 +66,7 @@ class FatCatsEnv(gym.Env):
             + self.game_config.treat_deck_size # discards
         )
 
-        max_card_value = max(max(self.game_config.treat_values), max(self.game_config.trick_values))
+        max_card_value = max(max(self.game_config.treat_card_values), max(self.game_config.trick_card_values))
 
         self.observation_space = gym.spaces.Box(
             low=0,
@@ -76,24 +81,24 @@ class FatCatsEnv(gym.Env):
         """ Allocate and reset all game state structures. """
         self.treat_deck = build_treat_deck(
             self.random_number_generator,
-            self.game_config.treat_values,
+            self.game_config.treat_card_values,
             self.game_config.treat_deck_size
         )
         self.player_hands = deal_trick_hands(
-            self.game_config.players,
+            self.game_config.number_of_players,
             self.game_config.trick_cards_per_player,
-            self.game_config.trick_values,
+            self.game_config.trick_card_values,
             self.random_number_generator
         )
-        self.player_scores = np.zeros(self.game_config.players, dtype=np.int16)
+        self.player_scores = np.zeros(self.game_config.number_of_players, dtype=np.int16)
         self.discarded_treats = np.zeros(self.game_config.treat_deck_size, dtype=np.int16)
-        self.current_round_bids = np.zeros(self.game_config.players, dtype=np.int16)
+        self.current_round_bids = np.zeros(self.game_config.number_of_players, dtype=np.int16)
         self.treat_idx = 0
         self.turn = 0 # current player index
 
     # Game logic methods
 
-    def _apply_action_and_get_bid(self, player_index: int, action) -> int:
+    def _apply_action_and_get_bid(self, player_index: int, action: np.ndarray) -> int:
         """ Mutate player hands according to the action and return the bid value. """
         player_hand = self.player_hands[player_index]
         if self.game_config.allow_multi_bid:
@@ -127,14 +132,26 @@ class FatCatsEnv(gym.Env):
         return None
     
     def _create_observation(self, player_index: int) -> np.ndarray:
-        """ Create an observation for the given player index. """
+        """Return a constant‑length flat vector view for *player_index*."""
         max_hand_size = self.game_config.trick_cards_per_player
-        hand_array = np.ndarray(self.player_hands[player_index], dtype=np.int16)
-        padded_hand = np.pad(hand_array, (0, max_hand_size - len(hand_array)), constant_values=0)
-        observation_components = [
-            np.array([self.treat_idx], dtype=np.int16),  # treat index
-            padded_hand,  # player hand
-            np.array([self.player_scores[player_index]], dtype=np.int16),  # player score
-            self.discarded_treats  # discarded treats
+        hand_list = self.player_hands[player_index]
+        hand_length: int = len(hand_list)
+
+        if hand_length >= max_hand_size:
+            padded_hand = np.asarray(hand_list[: max_hand_size], dtype=np.int16)
+        else:
+            pad_width: int = max_hand_size - hand_length
+            padded_hand = np.pad(
+                np.asarray(hand_list, dtype=np.int16),
+                (0, pad_width),
+                mode="constant",
+                constant_values=0,
+            )
+
+        components: list[np.ndarray] = [
+            np.array([self.treat_idx], dtype=np.int16),
+            padded_hand,
+            np.array([self.player_scores[player_index]], dtype=np.int16),
+            self.discarded_treats,
         ]
-        return np.concatenate(observation_components)
+        return np.concatenate(components)
