@@ -24,7 +24,7 @@ def test_from_dict_valid():
     """A minimal valid dict should build a model and keep defaults."""
     config = FatCatsConfig.model_validate(
         {
-            "players": 3,
+            "number_of_players": 3,
             "trick_cards_per_player": 7,
         }
     )
@@ -40,7 +40,7 @@ def test_from_dict_valid():
 def test_from_path_valid(tmp_path: Path):
     """Config loads & validates from JSON file via FatCatsConfig.from_path()."""
     payload: dict[str, int | bool | list[int]] = {
-        "players": 4,
+        "number_of_players": 4,
         "trick_cards_per_player": 8,
         "allow_multi_bid": True,
         "treat_card_values": [4, 11, 25],  # custom deck
