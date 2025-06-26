@@ -1,5 +1,6 @@
 import numpy as np
 from typing import Sequence
+from numba import njit
 
 
 def build_treat_deck(
@@ -24,13 +25,25 @@ def deal_trick_hands(
     ]
 
 
-def resolve_bids(bids: np.ndarray) -> int | None:
+@njit(cache=True, fastmath=True)
+def resolve_bids(bids: np.ndarray) -> int:
     """
-    Return winning player index or None for tie/no-bid.
+    Return winning player index or -1 for tie/no-bid.
     If allow_multi_bid=True, bids already contain sum of a player's cards.
     """
-    max_bid = bids.max()
-    if max_bid == 0:        # everyone passed
-        return None
-    winners = np.flatnonzero(bids == max_bid)
-    return int(winners[0]) if winners.size == 1 else None
+    max_bid = 0
+    winner = -1
+    tie = False
+
+    for idx in range(bids.size):
+        bid = int(bids[idx])
+        if bid > max_bid:
+            max_bid = bid
+            winner = idx
+            tie = False
+        elif bid == max_bid and bid > 0:
+            tie = True
+    
+    if max_bid == 0 or tie:
+        return -1
+    return winner

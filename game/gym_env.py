@@ -17,6 +17,13 @@ class FatCatsEnv(gym.Env):
         self.game_config = game_config
         self.random_number_generator = np.random.default_rng(seed)
         self._initailise_action_and_observation_spaces()
+        obs_length = (
+            1                                           # treat index
+            + self.game_config.trick_cards_per_player        # padded hand
+            + 1                                         # my score
+            + self.game_config.treat_deck_size               # discarded treats
+        )
+        self._obs_buffer = np.empty(obs_length, dtype=np.int16)
 
     # Gym API methods
      
@@ -132,26 +139,19 @@ class FatCatsEnv(gym.Env):
         return None
     
     def _create_observation(self, player_index: int) -> np.ndarray:
-        """Return a constant‑length flat vector view for *player_index*."""
-        max_hand_size = self.game_config.trick_cards_per_player
-        hand_list = self.player_hands[player_index]
-        hand_length: int = len(hand_list)
+        buf = self._obs_buffer          # alias – no new alloc
+        max_hand = self.game_config.trick_cards_per_player
+        
+        buf[0] = self.treat_idx
 
-        if hand_length >= max_hand_size:
-            padded_hand = np.asarray(hand_list[: max_hand_size], dtype=np.int16)
-        else:
-            pad_width: int = max_hand_size - hand_length
-            padded_hand = np.pad(
-                np.asarray(hand_list, dtype=np.int16),
-                (0, pad_width),
-                mode="constant",
-                constant_values=0,
-            )
+        hand_len = len(self.player_hands[player_index])
+        if hand_len:
+            buf[1 : 1 + hand_len] = self.player_hands[player_index, :hand_len]
+        if hand_len < max_hand:
+            buf[1 + hand_len : 1 + max_hand] = 0
 
-        components: list[np.ndarray] = [
-            np.array([self.treat_idx], dtype=np.int16),
-            padded_hand,
-            np.array([self.player_scores[player_index]], dtype=np.int16),
-            self.discarded_treats,
-        ]
-        return np.concatenate(components)
+        buf[1 + max_hand] = self.player_scores[player_index]
+
+        buf[-self.game_config.treat_deck_size :] = self.discarded_treats
+
+        return buf.copy()
