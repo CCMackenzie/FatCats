@@ -63,8 +63,8 @@ def test_deal_trick_hands_shape_and_values():
     "bids, expected",
     [
         (np.array([5, 3, 1]), 0),      # unique maximum
-        (np.array([1, 4, 4]), None),   # tie on max
-        (np.array([0, 0, 0]), None),   # everyone passed
+        (np.array([1, 4, 4]), -1),   # tie on max
+        (np.array([0, 0, 0]), -1),   # everyone passed
     ],
 )
 def test_resolve_bids(bids, expected): # type: ignore
