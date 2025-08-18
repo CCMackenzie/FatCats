@@ -1,8 +1,9 @@
 # benchmarks/bench_step.py
-import time, numpy as np
+import time
+
+from agents.random_agent import RandomAgent
 from game.game_config import FatCatsConfig
 from game.gym_env import FatCatsEnv
-from agents.random_agent import RandomAgent
 
 game_config = FatCatsConfig.model_validate({
     "number_of_players": 3,
