@@ -1,4 +1,8 @@
 .vscode/
+.idea/
+
+# Ignore profiling files
+*.prof
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
