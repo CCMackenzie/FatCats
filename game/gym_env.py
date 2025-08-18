@@ -17,6 +17,14 @@ class FatCatsEnv(gym.Env):
         self.game_config = game_config
         self.random_number_generator = np.random.default_rng(seed)
         self._initailise_action_and_observation_spaces()
+        obs_length = (
+            1                                           # treat index
+            + self.game_config.trick_cards_per_player        # padded hand
+            + 1                                         # my score
+            + self.game_config.treat_deck_size               # discarded treats
+        )
+        self._obs_buffer = np.empty(obs_length, dtype=np.int16)
+        self.turn: int = 0
 
     # Gym API methods
      
@@ -102,14 +110,20 @@ class FatCatsEnv(gym.Env):
         """ Mutate player hands according to the action and return the bid value. """
         player_hand = self.player_hands[player_index]
         if self.game_config.allow_multi_bid:
-            bitmask = np.asarray(action, dtype=np.int16)
-            if not bitmask.any():
+            mask = np.asarray(action, dtype=np.int8).ravel()  # ensure 1-D
+            hand_len = len(player_hand)
+            if hand_len == 0:
                 return 0
-            chosen_cards = np.flatnonzero(bitmask & (np.arange(len(player_hand)) < len(player_hand)))
-            bid_sum = sum(player_hand[card] for card in chosen_cards)
-            for card in sorted(map(int, chosen_cards), reverse=True):
-                player_hand.pop(card)
-            return bid_sum
+
+            chosen_idx = np.flatnonzero(mask[:hand_len])  # ignore bits beyond the hand
+            if chosen_idx.size == 0:
+                return 0
+
+            # sum chosen cards, then remove highest indices first
+            bid_sum = sum(player_hand[i] for i in chosen_idx)
+            for i in sorted(map(int, chosen_idx), reverse=True):
+                player_hand.pop(i)
+            return int(bid_sum)
         else:
             index: int = int(action)
             if index >= len(player_hand):
@@ -118,7 +132,8 @@ class FatCatsEnv(gym.Env):
         
     def _resolve_current_round(self) -> None:
         """ Resolve the current round of bids and update game state. """
-        winner = resolve_bids(self.current_round_bids)
+        winner_index = resolve_bids(self.current_round_bids)
+        winner = None if winner_index == -1 else winner_index
         treat_value = self.treat_deck[self.treat_idx]
         if winner is not None:
             self.player_scores[winner] += treat_value
@@ -132,26 +147,19 @@ class FatCatsEnv(gym.Env):
         return None
     
     def _create_observation(self, player_index: int) -> np.ndarray:
-        """Return a constant‑length flat vector view for *player_index*."""
-        max_hand_size = self.game_config.trick_cards_per_player
-        hand_list = self.player_hands[player_index]
-        hand_length: int = len(hand_list)
+        buf = self._obs_buffer
+        max_hand = self.game_config.trick_cards_per_player
+        
+        buf[0] = self.treat_idx
 
-        if hand_length >= max_hand_size:
-            padded_hand = np.asarray(hand_list[: max_hand_size], dtype=np.int16)
-        else:
-            pad_width: int = max_hand_size - hand_length
-            padded_hand = np.pad(
-                np.asarray(hand_list, dtype=np.int16),
-                (0, pad_width),
-                mode="constant",
-                constant_values=0,
-            )
+        hand_len = len(self.player_hands[player_index])
+        if hand_len:
+            buf[1 : 1 + hand_len] = self.player_hands[player_index]
+        if hand_len < max_hand:
+            buf[1 + hand_len : 1 + max_hand] = 0
 
-        components: list[np.ndarray] = [
-            np.array([self.treat_idx], dtype=np.int16),
-            padded_hand,
-            np.array([self.player_scores[player_index]], dtype=np.int16),
-            self.discarded_treats,
-        ]
-        return np.concatenate(components)
+        buf[1 + max_hand] = self.player_scores[player_index]
+
+        buf[-self.game_config.treat_deck_size :] = self.discarded_treats
+
+        return buf.copy()
